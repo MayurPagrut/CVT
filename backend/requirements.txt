@@ -1,8 +1,0 @@
-fastapi==0.112.1
-uvicorn==0.30.5
-tensorflow==2.16.1
-numpy==1.26.4
-opencv-python==4.10.0.84
-pymongo==4.8.0
-python-dotenv==1.0.1
-httpx==0.27.0
