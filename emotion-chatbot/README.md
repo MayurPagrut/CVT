@@ -66,8 +66,10 @@ cp .env.example .env
 # Edit .env and set: HF_API_KEY=your_huggingface_api_key_here
 
 # Start the server
-uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 8000
 ```
+
+If you see `ModuleNotFoundError: No module named ...` (e.g. `dotenv`), it almost always means you’re starting the backend with a different Python than the one you installed deps into. Make sure the backend venv is activated and prefer `python -m pip ...` / `python -m uvicorn ...` so you always use the active environment.
 
 Backend will be live at: **http://localhost:8000**
 API docs: **http://localhost:8000/docs**
@@ -141,6 +143,34 @@ def predict_emotion(frame_data: str = None):
 ```
 
 The API contract (`emotion` + `confidence`) remains identical — no frontend changes needed.
+
+---
+
+## 🧪 Enable Real ML Emotion Detection (Using emotion4.h5)
+
+This repo includes an optional TensorFlow-based emotion detector in the backend.
+
+1) Install optional ML dependencies into the backend venv:
+
+```bash
+cd backend
+venv\Scripts\activate
+python -m pip install -r requirements-ml.txt
+```
+
+2) Point the backend at your `.h5` model (optional):
+
+- Default path used automatically if it exists:
+    `emotion-chatbot/AI_companion_final/emotion4.h5`
+- Or set an explicit path in `backend/.env`:
+
+```env
+EMOTION_MODEL_PATH=..\AI_companion_final\emotion4.h5
+```
+
+3) Start the backend and frontend.
+
+When the camera is active, the frontend sends base64 frames to `POST /api/predict-emotion` and the UI updates with the model’s predicted mood.
 
 ---
 

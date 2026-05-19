@@ -7,6 +7,7 @@ Emotion-aware system prompt tailors responses to user's detected state.
 
 import httpx
 import os
+from pathlib import Path
 from typing import Optional
 
 # Hugging Face Inference Providers (OpenAI-compatible) endpoint.
@@ -14,6 +15,28 @@ from typing import Optional
 HF_BASE_URL = os.getenv("HF_BASE_URL", "https://router.huggingface.co/v1").rstrip("/")
 HF_API_URL = f"{HF_BASE_URL}/chat/completions"
 HF_MODEL = os.getenv("HF_MODEL", "google/gemma-3-27b-it")
+
+
+def _get_httpx_verify():
+    """Return the httpx 'verify' setting.
+
+    Corporate proxies often MITM TLS using an internal CA, which causes:
+      [SSL: CERTIFICATE_VERIFY_FAILED] self signed certificate in certificate chain
+
+    Prefer providing a CA bundle path (HF_CA_BUNDLE). As a last resort for local
+    dev only, you can disable verification via HF_SSL_VERIFY=false.
+    """
+
+    ca_bundle = os.getenv("HF_CA_BUNDLE", "").strip()
+    if ca_bundle:
+        p = Path(ca_bundle)
+        return str(p) if p.exists() else str(p)
+
+    ssl_verify = os.getenv("HF_SSL_VERIFY", "true").strip().lower()
+    if ssl_verify in {"0", "false", "no", "off"}:
+        return False
+
+    return True
 
 EMOTION_INSTRUCTIONS = {
     "sad": (
@@ -113,7 +136,7 @@ async def get_chat_response(
         "Content-Type": "application/json",
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=30.0, verify=_get_httpx_verify()) as client:
         response = await client.post(HF_API_URL, json=payload, headers=headers)
         response.raise_for_status()
         data = response.json()

@@ -10,6 +10,13 @@ ENV/
 # Project secrets (DO NOT COMMIT)
 backend/.env
 
+# Local markers
+backend/.ml_deps_installed
+
+# ML artifacts / large datasets (avoid pushing huge files to GitHub)
+AI_companion_final/fer-2013/
+AI_companion_final/*.h5
+
 # Python tooling
 .pytest_cache/
 .mypy_cache/

@@ -1,25 +1,47 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 
-export default function Webcam({ isActive, onStream, emotionColor = '#7c6af7' }) {
+export default function Webcam({ isActive, onStream, onVideoReady, onRequestEnable, emotionColor = '#7c6af7' }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const startRequestIdRef = useRef(0);
   const [status, setStatus] = useState('idle'); // idle | requesting | active | denied | error
   const [errorMsg, setErrorMsg] = useState('');
 
   const startWebcam = useCallback(async () => {
+    const requestId = ++startRequestIdRef.current;
     setStatus('requesting');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
         audio: false,
       });
+
+      // If camera was turned off while permission prompt was open, stop immediately.
+      if (!isActive || requestId !== startRequestIdRef.current) {
+        stream.getTracks().forEach(t => t.stop());
+        setStatus('idle');
+        return;
+      }
+
       streamRef.current = stream;
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        const videoEl = videoRef.current;
+
+        // Avoid "The play() request was interrupted by a new load request".
+        videoEl.onloadedmetadata = () => {
+          const p = videoEl.play();
+          if (p && typeof p.catch === 'function') {
+            p.catch(() => {
+              // ignore aborted play()
+            });
+          }
+        };
+
+        videoEl.srcObject = stream;
       }
       setStatus('active');
       onStream && onStream(stream);
+      onVideoReady && videoRef.current && onVideoReady(videoRef.current);
     } catch (err) {
       if (err.name === 'NotAllowedError') {
         setStatus('denied');
@@ -29,20 +51,32 @@ export default function Webcam({ isActive, onStream, emotionColor = '#7c6af7' })
         setErrorMsg(`Camera error: ${err.message}`);
       }
     }
-  }, [onStream]);
+  }, [isActive, onStream, onVideoReady]);
 
   const stopWebcam = useCallback(() => {
+    // Cancel any in-flight startWebcam.
+    startRequestIdRef.current += 1;
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
-    if (videoRef.current) videoRef.current.srcObject = null;
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+      } catch (_) {
+        // no-op
+      }
+      videoRef.current.onloadedmetadata = null;
+      videoRef.current.srcObject = null;
+    }
+    onVideoReady && onVideoReady(null);
     setStatus('idle');
-  }, []);
+  }, [onVideoReady]);
 
   useEffect(() => {
     if (isActive && status === 'idle') startWebcam();
-    if (!isActive && status === 'active') stopWebcam();
+    if (!isActive && (status === 'active' || status === 'requesting')) stopWebcam();
   }, [isActive, status, startWebcam, stopWebcam]);
 
   useEffect(() => () => stopWebcam(), [stopWebcam]);
@@ -71,13 +105,21 @@ export default function Webcam({ isActive, onStream, emotionColor = '#7c6af7' })
           {status === 'idle' && (
             <>
               <div className="text-4xl mb-1">📷</div>
-              <p className="text-sm text-gray-400 font-body">Camera not started</p>
+              <p className="text-sm text-gray-400 font-body">
+                {isActive ? 'Camera not started' : 'Camera is off'}
+              </p>
               <button
-                onClick={startWebcam}
+                onClick={() => {
+                  if (!isActive) {
+                    onRequestEnable && onRequestEnable();
+                    return;
+                  }
+                  startWebcam();
+                }}
                 className="px-4 py-2 rounded-xl text-sm font-display font-semibold text-white transition-all"
                 style={{ background: `${emotionColor}cc` }}
               >
-                Enable Camera
+                {isActive ? 'Enable Camera' : 'Start Camera'}
               </button>
             </>
           )}

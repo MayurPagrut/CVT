@@ -24,10 +24,11 @@ export function useEmotion() {
   const intervalRef = useRef(null);
   const prevEmotionRef = useRef('neutral');
 
-  const pollEmotion = useCallback(async () => {
+  const pollEmotion = useCallback(async (getFrameData) => {
     try {
       setError(null);
-      const data = await fetchEmotion(null);
+      const frameData = typeof getFrameData === 'function' ? getFrameData() : null;
+      const data = await fetchEmotion(frameData);
       const { emotion, confidence: conf, emoji } = data;
 
       setCurrentEmotion(emotion);
@@ -56,11 +57,11 @@ export function useEmotion() {
     }
   }, [emotionHistory]);
 
-  const startPolling = useCallback(() => {
+  const startPolling = useCallback((getFrameData) => {
     if (intervalRef.current) return;
     setIsPolling(true);
-    pollEmotion(); // immediate first call
-    intervalRef.current = setInterval(pollEmotion, POLL_INTERVAL_MS);
+    pollEmotion(getFrameData); // immediate first call
+    intervalRef.current = setInterval(() => pollEmotion(getFrameData), POLL_INTERVAL_MS);
   }, [pollEmotion]);
 
   const stopPolling = useCallback(() => {

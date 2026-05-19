@@ -36,7 +36,7 @@ EMOTION_EMOJI_MAP = {
 async def predict_emotion_endpoint(request: EmotionRequest = None):
     """
     Predict current emotion from webcam frame.
-    Currently simulated — replace emotion_service internals for ML integration.
+    Uses the TensorFlow model when available; returns neutral when no face is detected.
     """
     frame_data = request.frame_data if request else None
     emotion, confidence = predict_emotion(frame_data)

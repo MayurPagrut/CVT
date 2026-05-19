@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useEmotion } from './hooks/useEmotion';
 import { useChat } from './hooks/useChat';
 import Webcam from './components/Webcam';
@@ -8,6 +8,11 @@ import FloatingEmoji from './components/FloatingEmoji';
 
 export default function App() {
   const [webcamActive, setWebcamActive] = useState(false);
+  const videoElRef = useRef(null);
+
+  const handleVideoReady = useCallback((videoEl) => {
+    videoElRef.current = videoEl;
+  }, []);
 
   const {
     currentEmotion, currentEmoji, confidence, trend,
@@ -20,14 +25,51 @@ export default function App() {
   } = useChat();
 
   const handleTogglePolling = useCallback(() => {
+    const getFrameData = () => {
+      const video = videoElRef.current;
+      if (!video) return null;
+      if (video.readyState < 2) return null;
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (!w || !h) return null;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.drawImage(video, 0, 0, w, h);
+      return canvas.toDataURL('image/jpeg', 0.7);
+    };
+
     if (isPolling) stopPolling();
-    else startPolling();
+    else startPolling(getFrameData);
   }, [isPolling, startPolling, stopPolling]);
 
   const handleToggleWebcam = () => {
     const next = !webcamActive;
     setWebcamActive(next);
-    if (next && !isPolling) startPolling();
+    if (next && !isPolling) {
+      // Start polling with frame capture once camera is enabled.
+      // If the video element isn't ready yet, the first poll will fall back to null.
+      const getFrameData = () => {
+        const video = videoElRef.current;
+        if (!video) return null;
+        if (video.readyState < 2) return null;
+        const w = video.videoWidth;
+        const h = video.videoHeight;
+        if (!w || !h) return null;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+        ctx.drawImage(video, 0, 0, w, h);
+        return canvas.toDataURL('image/jpeg', 0.7);
+      };
+      startPolling(getFrameData);
+    }
     if (!next && isPolling) stopPolling();
   };
 
@@ -121,6 +163,8 @@ export default function App() {
             <Webcam
               isActive={webcamActive}
               emotionColor={meta.color}
+              onVideoReady={handleVideoReady}
+              onRequestEnable={() => setWebcamActive(true)}
             />
           </div>
 
